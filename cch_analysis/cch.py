@@ -98,8 +98,8 @@ def correlogram(t1, t2=None, bin_size=.001, limit=.02, auto=False,
     bins = np.arange(limit[0], limit[1] + bin_size, bin_size)
 
     # Determine the indexes into `t2` that are relevant for each spike in `t1`
-    ii2 = np.searchsorted(t2, t1 - limit)
-    jj2 = np.searchsorted(t2, t1 + limit)
+    ii2 = np.searchsorted(t2, t1 + limit[0])
+    jj2 = np.searchsorted(t2, t1 + limit[1])
 
     # Concatenate the recentered spike times into a big array
     # We have excluded spikes outside of the histogram range to limit
