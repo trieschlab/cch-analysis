@@ -7,9 +7,10 @@ from setuptools import setup, find_packages
 long_description = open("README.md").read()
 
 install_requires = [
-    'numpy',
+    'numpy>=1.9',
     'collections',
-    'matplotlib']
+    'matplotlib',
+    'scipy']
 extras_require = {
     'testing': ['pytest'],
     'docs': ['numpydoc>=0.5',
