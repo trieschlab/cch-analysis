@@ -65,13 +65,20 @@ def correlogram(t1, t2=None, bin_size=.001, limit=.02, auto=False,
     ...                            limit=limit, auto=False)
     """
     if auto: t2 = t1
+
+    # allow to set start and stop of limit
+    if not isinstance(limit, Iterable):
+        limit = [-limit, limit]
+    
     # For auto-CCGs, make sure we use the same exact values
     # Otherwise numerical issues may arise when we compensate for zeros later
-    if not int(limit * 1e10) % int(bin_size * 1e10) == 0:
-        raise ValueError(
-            'Time limit {} must be a '.format(limit) +
-            'multiple of bin_size {}'.format(bin_size) +
-            ' remainder = {}'.format(limit % bin_size))
+    for lim in limit:
+        if not int(lim * 1e10) % int(bin_size * 1e10) == 0:
+            raise ValueError(
+                'Time limit {} must be a '.format(lim) +
+                'multiple of bin_size {}'.format(bin_size) +
+                ' remainder = {}'.format(lim % bin_size))
+    
     # For efficiency, `t1` should be no longer than `t2`
     swap_args = False
     if len(t1) > len(t2):
@@ -84,12 +91,10 @@ def correlogram(t1, t2=None, bin_size=.001, limit=.02, auto=False,
 
     # Determine the bin edges for the histogram
     # Later we will rely on the symmetry of `bins` for undoing `swap_args`
-    limit = float(limit)
+    limit = [float(lim) for lim in limit]
 
     # The numpy.arange method overshoots slightly the edges i.e. bin_size + epsilon
     # which leads to inclusion of spikes falling on edges.
-    if not isinstance(limit, Iterable):
-        limit = [-limit, limit]
     bins = np.arange(limit[0], limit[1] + bin_size, bin_size)
 
     # Determine the indexes into `t2` that are relevant for each spike in `t1`
