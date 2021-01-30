@@ -8,7 +8,7 @@ long_description = open("README.md").read()
 
 install_requires = [
     'numpy>=1.9',
-    'collections',
+#    'collections',
     'matplotlib',
     'scipy']
 extras_require = {
