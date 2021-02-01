@@ -207,3 +207,53 @@ def cch_significance(t1, t2, bin_size, limit, hollow_fraction, width):
     ppeak = poisson_continuity_correction(cch, max_vals)
     return ppeak, pfast, bins, cch, cch_smooth
 
+def transfer_probability(x, y, bin_size, limit, hollow_fraction, width,
+                         y_mu, y_sigma):
+    """Calculate the naive transfer probability using a cross correlation
+    histogram as in _[1].
+    Parameters
+    ---------
+    x : array
+        First spiketrain, raw spike times in seconds.
+    y : array
+        Second spiketrain, raw spike times in seconds.
+    bin_size : float
+        Width of each bar in histogram in seconds.
+    limit : float
+        Positive and negative extent of histogram, in seconds.
+    kernlen : int
+        Length of kernel, must be uneven (kernlen % 2 == 1)
+    width : float
+        Width of kernel (std if gaussian)
+    hollow_fraction : float
+        Fraction of the central bin to removed.
+    y_mu : float
+        Average time for downstream spikes (y) in response to upstream spikes (x)
+    y_sigma : float
+        Standard deviation of downstream response times to upstream spikes (x).
+    References
+    ----------
+    _[1] : English et al. 2017, Neuron, Pyramidal Cell-Interneuron Circuit Architecture
+    and Dynamics in Hippocampal Networks
+    Authors
+    -------
+    Tristan Stoeber, Mikkel Lepperød
+    """
+    cch, bins = correlogram(
+        x, y, bin_size=bin_size, limit=limit, density=False)
+    bins = bins[:-1]
+
+    cch_s = cch_convolve(
+        cch=cch, width=width, hollow_fraction=hollow_fraction)
+
+    mask = (bins >= y_mu - y_sigma) & (bins <= y_mu + y_sigma)
+    cmax = np.max(cch[mask])
+    idx, = np.where(cch==cmax * mask)
+    idx = idx if len(idx) == 1 else idx[0]
+    pfast, = poisson_continuity_correction(cmax, cch_s[idx])
+    cch_half_len = int(np.floor(len(cch) / 2.))
+    max_pre = np.max(cch[:cch_half_len])
+    ppeak, = poisson_continuity_correction(cmax, max_pre)
+    ptime = float(bins[idx])
+    trans_prob = sum(cch[mask] - cch_s[mask]) / len(x)
+    return trans_prob, ppeak, pfast, ptime, cmax
