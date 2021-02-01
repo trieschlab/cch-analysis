@@ -1,25 +1,7 @@
 import numpy as np
 from collections.abc import Iterable
 import matplotlib.pyplot as plt
-from .tools import hollow_kernel, poisson_continuity_correction
-
-def histogram(val, bins, density=False):
-    '''Fast histogram
-    Assuming:
-        val, bins are sorted
-        bins increase monotonically and uniformly
-        all(bins[0] <= v <= bins[-1] for v in val)
-        Copied from CINPLA/causal-optoconnectics/
-    '''
-    result = np.zeros(len(bins) - 1).astype(int)
-    search = np.searchsorted(bins, val, side='right')
-    cnt = np.bincount(search)[1:len(result)]
-    result[:len(cnt)] = cnt
-    if density:
-        db = np.array(np.diff(bins), float)
-        return result / db / result.sum(), bins
-    return result, bins
-
+from .tools import hollow_kernel, poisson_continuity_correction, histogram
 
 def correlogram(t1, t2=None, bin_size=.001, limit=.02, auto=False,
                 density=False):
@@ -29,7 +11,6 @@ def correlogram(t1, t2=None, bin_size=.001, limit=.02, auto=False,
     several tweaks were made for efficiency.
     Originally authored by Chris Rodger, copied from OpenElectrophy, licenced
     with CeCill-B.
-
     Parameters
     ---------
     t1 : np.array
@@ -38,7 +19,7 @@ def correlogram(t1, t2=None, bin_size=.001, limit=.02, auto=False,
         Second spiketrain, raw spike times in seconds.
     bin_size : float
         Width of each bar in histogram in seconds.
-    limit : float, list
+    limit : float
         Positive and negative extent of histogram, in seconds.
     auto : bool
         If True, then returns autocorrelogram of `t1` and in
@@ -67,20 +48,13 @@ def correlogram(t1, t2=None, bin_size=.001, limit=.02, auto=False,
     ...                            limit=limit, auto=False)
     """
     if auto: t2 = t1
-
-    # allow to set start and stop of limit
-    if not isinstance(limit, Iterable):
-        limit = [-limit, limit]
-    
     # For auto-CCGs, make sure we use the same exact values
     # Otherwise numerical issues may arise when we compensate for zeros later
-    for lim in limit:
-        if not int(lim * 1e10) % int(bin_size * 1e10) == 0:
-            raise ValueError(
-                'Time limit {} must be a '.format(lim) +
-                'multiple of bin_size {}'.format(bin_size) +
-                ' remainder = {}'.format(lim % bin_size))
-    
+    if not int(limit * 1e10) % int(bin_size * 1e10) == 0:
+        raise ValueError(
+            'Time limit {} must be a '.format(limit) +
+            'multiple of bin_size {}'.format(bin_size) +
+            ' remainder = {}'.format(limit % bin_size))
     # For efficiency, `t1` should be no longer than `t2`
     swap_args = False
     if len(t1) > len(t2):
@@ -93,15 +67,15 @@ def correlogram(t1, t2=None, bin_size=.001, limit=.02, auto=False,
 
     # Determine the bin edges for the histogram
     # Later we will rely on the symmetry of `bins` for undoing `swap_args`
-    limit = [float(lim) for lim in limit]
+    limit = float(limit)
 
     # The numpy.arange method overshoots slightly the edges i.e. bin_size + epsilon
     # which leads to inclusion of spikes falling on edges.
-    bins = np.arange(limit[0], limit[1] + bin_size, bin_size)
+    bins = np.arange(-limit, limit + bin_size, bin_size)
 
     # Determine the indexes into `t2` that are relevant for each spike in `t1`
-    ii2 = np.searchsorted(t2, t1 + limit[0])
-    jj2 = np.searchsorted(t2, t1 + limit1])
+    ii2 = np.searchsorted(t2, t1 - limit)
+    jj2 = np.searchsorted(t2, t1 + limit)
 
     # Concatenate the recentered spike times into a big array
     # We have excluded spikes outside of the histogram range to limit
@@ -130,7 +104,7 @@ def correlogram(t1, t2=None, bin_size=.001, limit=.02, auto=False,
     return count, bins
 
 
-def fit_latency(pre, post, bin_size=.1e-3, limit=20e-3, init=[5e-4, 5e-4], plot=False, ax=None):
+def fit_latency(pre, post, bin_size=.1e-3, limit=20e-3, init=[5e-4, 5e-4], plot=False):
     '''
     Fit a gaussian PDF to density of CCH
     '''
@@ -142,13 +116,12 @@ def fit_latency(pre, post, bin_size=.1e-3, limit=20e-3, init=[5e-4, 5e-4], plot=
     error  = lambda p, x, y: (y - normpdf(p, x))
     (delta_t, sigma), _ = leastsq(error, init, args=(b, c))
     if plot:
-        if ax is None:
-            fig, ax = plt.subplots(1, 1)
-        ax.bar(b, c, width=-bin_size, align='edge')
+        import matplotlib.pyplot as plt
+        plt.bar(b, c, width=-bin_size, align='edge')
         y = normpdf((delta_t, sigma), b)
-        ax.plot(b, y, 'r--', linewidth=2)
-        ax.set_title('$\Delta t$ {:.3f} $\sigma$ {:.3f}'.format(delta_t, sigma))
-        ax.axvspan(delta_t - sigma, delta_t + sigma, alpha=.5, color='cyan')
+        plt.plot(b, y, 'r--', linewidth=2)
+        plt.title('$\Delta t$ {:.3f} $\sigma$ {:.3f}'.format(delta_t, sigma))
+        plt.axvspan(delta_t - sigma, delta_t + sigma, alpha=.5, color='cyan')
     return delta_t, sigma
 
 
